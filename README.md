@@ -6,3 +6,4 @@ a Rust implementation of a [hollow heap](http://www.cs.au.dk/~tdh/papers/Hollow-
 + [ ] remove unsafe?
 + [ ] support references
 + [ ] extract types into their own files?
++ [ ] use crate for Pool/slab/Arena?
