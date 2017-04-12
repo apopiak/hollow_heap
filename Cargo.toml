@@ -1,0 +1,10 @@
+[package]
+name = "hollow_heap"
+version = "0.1.0"
+authors = ["Alexander Popiak <alexander.popiak@gmail.com>"]
+
+[dependencies]
+
+[[example]]
+name = "hollow_heap"
+crate-type = ["bin"]
