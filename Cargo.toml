@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Alexander Popiak <alexander.popiak@gmail.com>"]
 
 [dependencies]
+generational-arena = "0.2.0"
 
 [[example]]
 name = "hollow_heap"
