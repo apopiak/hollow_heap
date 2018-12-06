@@ -5,7 +5,7 @@ a Rust implementation of a [hollow heap](http://www.cs.au.dk/~tdh/papers/Hollow-
 
 ## Todos
 + [ ] support min heap/generic heap
-+ [ ] remove unsafe?
++ [x] remove unsafe?
 + [ ] support references
 + [ ] extract types into their own files?
-+ [ ] use crate for Pool/slab/Arena?
++ [x] use crate for Pool/slab/Arena?
