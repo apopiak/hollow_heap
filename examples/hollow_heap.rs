@@ -3,7 +3,9 @@ extern crate hollow_heap;
 use hollow_heap::HollowHeap;
 
 fn example_one() {
-    println!("example_one (heap returns the pushed elements in sorted order and then returns None)");
+    println!(
+        "example_one (heap returns the pushed elements in sorted order and then returns None)"
+    );
     let mut heap: HollowHeap<u8> = HollowHeap::new();
     heap.push(3);
     heap.push(8);

@@ -1,7 +1,6 @@
 use std::cmp;
 use std::collections::VecDeque;
 
-extern crate generational_arena;
 use generational_arena::{Arena, Index};
 
 #[derive(Debug, Clone)]
@@ -89,7 +88,7 @@ impl<T: Ord + Copy> HollowHeap<T> {
     pub fn push(&mut self, value: T) -> Index {
         let index = Node::new_in_arena(&mut self.dag, value);
         if let Some(root_index) = self.dag_root {
-            let (mut root, mut node) = self.dag.get2_mut(root_index, index);
+            let (root, node) = self.dag.get2_mut(root_index, index);
             // unwrap should be safe because these indices come from inside the dag
             self.dag_root = Some(root.unwrap().link(node.unwrap()));
         } else {
@@ -113,14 +112,12 @@ impl<T: Ord + Copy> HollowHeap<T> {
         } else {
             // the changed value is not the root and thus will become hollow
             let (new_index, rank) = {
-                let rank = {
-                    let node = self
-                        .dag
-                        .get_mut(index)
-                        .expect("Should not be accessing the heap with an invalid index.");
-                    node.item = None;
-                    node.rank
-                };
+                let node = self
+                    .dag
+                    .get_mut(index)
+                    .expect("Should not be accessing the heap with an invalid index.");
+                node.item = None;
+                let rank = node.rank;
                 (self.push(new_val), rank)
             };
             let second_parent = {
@@ -201,8 +198,7 @@ impl<T: Ord + Copy> HollowHeap<T> {
                         roots_by_rank.resize(rank + 1, None);
                     }
                     while let Some(index) = roots_by_rank[rank] {
-                        let (mut first_node, mut second_node) =
-                            self.dag.get2_mut(index, cur_child_idx);
+                        let (first_node, second_node) = self.dag.get2_mut(index, cur_child_idx);
                         // unwrap should be safe because these indices come from inside the dag
                         cur_child_idx = first_node.unwrap().ranked_link(&mut second_node.unwrap());
                         roots_by_rank[rank] = None;
@@ -211,7 +207,8 @@ impl<T: Ord + Copy> HollowHeap<T> {
                             roots_by_rank.push(None);
                         }
                     }
-                    max_rank = cmp::max(rank, max_rank); // the ranked_link increased the rank
+                    // the ranked_link increased the rank
+                    max_rank = cmp::max(rank, max_rank);
                     roots_by_rank.resize(max_rank + 1, None);
                     roots_by_rank[rank] = Some(cur_child_idx);
                 }
@@ -240,7 +237,8 @@ impl<T: Ord + Copy> HollowHeap<T> {
             .map(|root_index| {
                 let item = self.dag[root_index].item.take();
                 (item, self.delete(root_index))
-            }).unwrap_or((None, None));
+            })
+            .unwrap_or((None, None));
         self.dag_root = new_root_idx;
         result
     }
