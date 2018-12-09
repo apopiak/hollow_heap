@@ -6,19 +6,11 @@ use proptest::collection::vec;
 
 use hollow_heap::HollowHeap;
 
-fn take<T>(mut vec: Vec<T>, index: usize) -> Option<T> {
-    if vec.get(index).is_none() {
-        None
-    } else {
-        Some(vec.swap_remove(index))
-    }
-}
-
 proptest! {
 
     #[test]
     fn doesnt_crash(num in 0..100000) {
-        let mut heap = HollowHeap::new();
+        let mut heap = HollowHeap::max_heap();
         heap.push(num);
         assert!(heap.pop() == Some(num));
         assert!(heap.pop() == None);
@@ -27,7 +19,7 @@ proptest! {
     #[test]
     fn repeated_pop_returns_sorted_vec(vector in vec(u32::arbitrary(), 0..1000)) {
         println!("{:?}", vector);
-        let mut heap = HollowHeap::new();
+        let mut heap = HollowHeap::max_heap();
         for num in vector.iter() {
             heap.push(num);
         }
@@ -42,7 +34,7 @@ proptest! {
     #[test]
     fn doesnt_crash_with_delete_and_increase_key(vector in vec(u32::arbitrary(), 2..1000)) {
         println!("{:?}", vector);
-        let mut heap = HollowHeap::new();
+        let mut heap = HollowHeap::max_heap();
         let mut index = None;
         let mut second_index = None;
         for num in vector.iter() {

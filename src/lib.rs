@@ -41,19 +41,19 @@ impl<T: Ord + Copy> Node<Index, T, T> {
         self.index.unwrap()
     }
 
-    fn link(&mut self, other: &mut Self) -> Index {
+    fn link(&mut self, other: &mut Self, compare: fn(lhs: &T, rhs: &T) -> bool) -> Index {
         // this linking behaviour makes it a max-heap
-        if self.key > other.key {
+        if compare(&self.key, &other.key) {
             self.add_child(other)
         } else {
             other.add_child(self)
         }
     }
 
-    fn ranked_link(&mut self, other: &mut Self) -> Index {
+    fn ranked_link(&mut self, other: &mut Self, compare: fn(lhs: &T, rhs: &T) -> bool) -> Index {
         assert!(self.rank == other.rank);
         // this linking behaviour makes it a max-heap
-        if self.key > other.key {
+        if compare(&self.key, &other.key) {
             self.rank += 1;
             self.add_child(other)
         } else {
@@ -67,18 +67,27 @@ impl<T: Ord + Copy> Node<Index, T, T> {
     }
 }
 
-#[derive(Debug)]
 pub struct HollowHeap<T> {
     pub dag: Arena<Node<Index, T, T>>,
     pub dag_root: Option<Index>,
+    compare: fn(&T, &T) -> bool,
 }
 
 impl<T: Ord + Copy> HollowHeap<T> {
-    pub fn new() -> HollowHeap<T> {
+    pub fn new(compare: fn(&T, &T) -> bool) -> HollowHeap<T> {
         HollowHeap {
             dag: Arena::new(),
             dag_root: None,
+            compare,
         }
+    }
+
+    pub fn max_heap() -> HollowHeap<T> {
+        HollowHeap::new(|lhs, rhs| lhs > rhs)
+    }
+
+    pub fn min_heap() -> HollowHeap<T> {
+        HollowHeap::new(|lhs, rhs| lhs < rhs)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -90,7 +99,7 @@ impl<T: Ord + Copy> HollowHeap<T> {
         if let Some(root_index) = self.dag_root {
             let (root, node) = self.dag.get2_mut(root_index, index);
             // unwrap should be safe because these indices come from inside the dag
-            self.dag_root = Some(root.unwrap().link(node.unwrap()));
+            self.dag_root = Some(root.unwrap().link(node.unwrap(), self.compare));
         } else {
             self.dag_root = Some(index);
         }
@@ -200,7 +209,9 @@ impl<T: Ord + Copy> HollowHeap<T> {
                     while let Some(index) = roots_by_rank[rank] {
                         let (first_node, second_node) = self.dag.get2_mut(index, cur_child_idx);
                         // unwrap should be safe because these indices come from inside the dag
-                        cur_child_idx = first_node.unwrap().ranked_link(&mut second_node.unwrap());
+                        cur_child_idx = first_node
+                            .unwrap()
+                            .ranked_link(&mut second_node.unwrap(), self.compare);
                         roots_by_rank[rank] = None;
                         rank = rank + 1;
                         if rank >= roots_by_rank.len() {
@@ -223,7 +234,7 @@ impl<T: Ord + Copy> HollowHeap<T> {
                     Some(next_root_index) => {
                         let (root, other_root) = self.dag.get2_mut(next_root_index, root_index);
                         // unwrap should be safe because these indices come from inside the dag
-                        next_root = Some(root.unwrap().link(other_root.unwrap()));
+                        next_root = Some(root.unwrap().link(other_root.unwrap(), self.compare));
                     }
                 }
             });
@@ -246,13 +257,13 @@ impl<T: Ord + Copy> HollowHeap<T> {
 
 #[test]
 fn new_heap_is_empty() {
-    let heap: HollowHeap<u8> = HollowHeap::new();
+    let heap: HollowHeap<u8> = HollowHeap::max_heap();
     assert!(heap.is_empty());
 }
 
 #[test]
 fn push_nodes() {
-    let mut heap: HollowHeap<u8> = HollowHeap::new();
+    let mut heap: HollowHeap<u8> = HollowHeap::max_heap();
     assert!(heap.is_empty());
     heap.push(2);
     heap.push(5);
@@ -262,7 +273,7 @@ fn push_nodes() {
 
 #[test]
 fn peek_node() {
-    let mut heap: HollowHeap<u8> = HollowHeap::new();
+    let mut heap: HollowHeap<u8> = HollowHeap::max_heap();
     assert!(heap.is_empty());
     heap.push(2);
     heap.push(4);
@@ -270,8 +281,8 @@ fn peek_node() {
 }
 
 #[test]
-fn pop_node() {
-    let mut heap: HollowHeap<u8> = HollowHeap::new();
+fn pop_node_max_heap() {
+    let mut heap: HollowHeap<u8> = HollowHeap::max_heap();
     assert!(heap.is_empty());
     heap.push(2);
     heap.push(8);
@@ -283,5 +294,22 @@ fn pop_node() {
     assert!(heap.pop() == Some(4));
     assert!(heap.pop() == Some(2));
     assert!(heap.pop() == Some(1));
+    assert!(heap.pop() == None);
+}
+
+#[test]
+fn pop_node_min_heap() {
+    let mut heap: HollowHeap<u8> = HollowHeap::min_heap();
+    assert!(heap.is_empty());
+    heap.push(2);
+    heap.push(8);
+    heap.push(4);
+    heap.push(9);
+    heap.push(1);
+    assert!(heap.pop() == Some(1));
+    assert!(heap.pop() == Some(2));
+    assert!(heap.pop() == Some(4));
+    assert!(heap.pop() == Some(8));
+    assert!(heap.pop() == Some(9));
     assert!(heap.pop() == None);
 }
