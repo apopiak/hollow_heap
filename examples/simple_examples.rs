@@ -4,9 +4,28 @@ use hollow_heap::HollowHeap;
 
 fn example_one() {
     println!(
-        "example_one (heap returns the pushed elements in sorted order and then returns None)"
+        "example_one (heap returns the pushed elements in sorted - greatest to smallest - order and then returns None)"
     );
-    let mut heap: HollowHeap<u8> = HollowHeap::new();
+    let mut heap: HollowHeap<u8> = HollowHeap::max_heap();
+    heap.push(3);
+    heap.push(8);
+    heap.push(17);
+    heap.push(5);
+    heap.push(9);
+    println!("{:?}", heap.pop());
+    println!("{:?}", heap.pop());
+    println!("{:?}", heap.pop());
+    println!("{:?}", heap.pop());
+    println!("{:?}", heap.pop());
+    println!("{:?}", heap.pop());
+    println!("");
+}
+
+fn example_min_heap() {
+    println!(
+        "example_one (heap returns the pushed elements in sorted - smalles to greatest - order and then returns None)"
+    );
+    let mut heap: HollowHeap<u8> = HollowHeap::min_heap();
     heap.push(3);
     heap.push(8);
     heap.push(17);
@@ -24,7 +43,7 @@ fn example_one() {
 fn example_vec() {
     println!("example_vec (order of return of the heap equals a sorted vec)");
     let mut my_vec = vec![1, -5, 6, 10, -7, 9, 100000, -555, 666, 100];
-    let mut heap = HollowHeap::new();
+    let mut heap = HollowHeap::max_heap();
     {
         for num in my_vec.iter() {
             heap.push(num.clone());
@@ -46,7 +65,7 @@ fn example_vec() {
 
 fn example_increase() {
     println!("example_increase (demonstrate the increase_key function)");
-    let mut heap = HollowHeap::new();
+    let mut heap = HollowHeap::max_heap();
     heap.push(1);
     let second = heap.push(2);
     heap.push(3);
@@ -61,7 +80,7 @@ fn example_increase() {
 fn example_complicated() {
     println!("example_complicated (lots of stuff happening :-D)");
     let vec1 = vec![1, -5, 6, 10, -555, 666, 100];
-    let mut heap = HollowHeap::new();
+    let mut heap = HollowHeap::max_heap();
     let mut five = None;
     {
         for num in vec1.into_iter() {
@@ -90,6 +109,7 @@ fn example_complicated() {
 
 fn main() {
     example_one();
+    example_min_heap();
     example_vec();
     example_increase();
     example_complicated();

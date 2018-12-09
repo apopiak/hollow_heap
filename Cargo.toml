@@ -11,5 +11,9 @@ generational-arena = "0.2.0"
 proptest = "0.8.7"
 
 [[example]]
-name = "hollow_heap"
+name = "simple_examples"
 crate-type = ["bin"]
+
+[[example]]
+name = "dijkstra"
+crate-type = ["lib"]
