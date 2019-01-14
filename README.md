@@ -1,5 +1,5 @@
 # hollow_heap
-a Rust implementation of a [hollow heap](http://www.cs.au.dk/~tdh/papers/Hollow-heaps.pdf)
+a Rust implementation of a [hollow heap](https://arxiv.org/abs/1510.06535)
 
 **Note: this is (pre-)alpha software** definitely not fit for production use.
 
