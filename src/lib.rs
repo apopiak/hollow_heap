@@ -42,7 +42,6 @@ impl<T: Ord + Copy> Node<Index, T, T> {
     }
 
     fn link(&mut self, other: &mut Self, compare: fn(lhs: &T, rhs: &T) -> bool) -> Index {
-        // this linking behaviour makes it a max-heap
         if compare(&self.key, &other.key) {
             self.add_child(other)
         } else {
@@ -52,7 +51,6 @@ impl<T: Ord + Copy> Node<Index, T, T> {
 
     fn ranked_link(&mut self, other: &mut Self, compare: fn(lhs: &T, rhs: &T) -> bool) -> Index {
         assert!(self.rank == other.rank);
-        // this linking behaviour makes it a max-heap
         if compare(&self.key, &other.key) {
             self.rank += 1;
             self.add_child(other)
