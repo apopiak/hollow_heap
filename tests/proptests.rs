@@ -42,6 +42,8 @@ proptest! {
                 index = Some(heap.push(*num));
             } else if second_index.is_none() {
                 second_index = Some(heap.push(*num));
+            } else {
+                heap.push(*num);
             }
         }
 
@@ -51,5 +53,6 @@ proptest! {
         let value = *heap.peek().unwrap();
         heap.increase_key(index, value + 1);
         heap.delete(second_index);
+        while heap.pop() != None {}
     }
 }
