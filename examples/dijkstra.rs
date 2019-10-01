@@ -373,11 +373,7 @@ impl<T: PartialEq> Graph<T> {
         discovered.insert(start);
 
         while !q.is_empty() {
-            let v: Option<usize> = if bfs {
-                q.pop_front()
-            } else {
-                q.pop_back()
-            };
+            let v: Option<usize> = if bfs { q.pop_front() } else { q.pop_back() };
             match v {
                 None => {} // q is empty
                 Some(v) => {
