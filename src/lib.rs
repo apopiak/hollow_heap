@@ -166,9 +166,10 @@ impl<T: Ord + Copy> HollowHeap<T> {
                 node.item = None;
                 node.second_parent = None;
                 return self.dag_root;
-            } else {
-                return None;
             }
+            // nothing todo if item is not present in dag
+            // println!("No element found to delete at {:?}", index);
+            return None;
         }
         // index is the root index from here
         let root_index = index;
@@ -178,6 +179,7 @@ impl<T: Ord + Copy> HollowHeap<T> {
             root.next = None;
             root.second_parent = None;
         } else {
+            // println!("No root found to delete at {:?}", root_index);
             return None;
         }
         let mut queue = VecDeque::new();
