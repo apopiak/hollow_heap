@@ -35,7 +35,7 @@ impl<T: Ord + Copy> Node<Index, T, T> {
         index
     }
 
-    pub fn add_child(&mut self, new_child: &mut Node<Index, T, T>) -> Index {
+    fn add_child(&mut self, new_child: &mut Node<Index, T, T>) -> Index {
         new_child.next = self.child;
         self.child = Some(new_child.index.unwrap());
         self.index.unwrap()
