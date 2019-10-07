@@ -65,10 +65,18 @@ impl<T: Ord + Copy> Node<Index, T, T> {
     }
 }
 
+#[derive(Clone)]
 pub struct HollowHeap<T> {
     pub dag: Arena<Node<Index, T, T>>,
     pub dag_root: Option<Index>,
     compare: fn(&T, &T) -> bool,
+}
+
+use std::fmt;
+impl<T: Ord + Copy + fmt::Debug> fmt::Debug for HollowHeap<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "HollowHeap {{ dag_root: {:?}, dag: {:?} }}", self.dag_root, self.dag)
+    }
 }
 
 impl<T: Ord + Copy> HollowHeap<T> {
