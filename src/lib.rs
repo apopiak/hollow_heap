@@ -75,7 +75,11 @@ pub struct HollowHeap<T> {
 use std::fmt;
 impl<T: Ord + Copy + fmt::Debug> fmt::Debug for HollowHeap<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "HollowHeap {{ dag_root: {:?}, dag: {:?} }}", self.dag_root, self.dag)
+        write!(
+            f,
+            "HollowHeap {{ dag_root: {:?}, dag: {:?} }}",
+            self.dag_root, self.dag
+        )
     }
 }
 
@@ -121,7 +125,10 @@ impl<T: Ord + Copy> HollowHeap<T> {
         } else if self.dag_root == Some(index) {
             // the changed value is the root so will be updated in-place
             let ref mut node = self.dag[index];
-            assert!((self.compare)(&new_val, &node.key), "only allow increasing keys to greater values");
+            assert!(
+                (self.compare)(&new_val, &node.key),
+                "only allow increasing keys to greater values"
+            );
             node.item = Some(new_val);
             node.key = new_val.into();
             index
@@ -132,7 +139,10 @@ impl<T: Ord + Copy> HollowHeap<T> {
                     .dag
                     .get_mut(index)
                     .expect("Should not be accessing the heap with an invalid index.");
-                assert!((self.compare)(&new_val, &node.key), "only allow increasing keys to greater values");
+                assert!(
+                    (self.compare)(&new_val, &node.key),
+                    "only allow increasing keys to greater values"
+                );
                 node.item = None;
                 let rank = node.rank;
                 (self.push(new_val), rank)
