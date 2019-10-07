@@ -116,52 +116,55 @@ impl<T: Ord + Copy> HollowHeap<T> {
         index
     }
 
-    /// increase the key (used for sorting) of the Node at `index`
+    /// increase or decrease the key (used for sorting) of the Node at `index`
     ///
-    /// expects `dag_root` to not be empty and `index` to be valid
-    pub fn increase_key(&mut self, index: Index, new_val: T) -> Index {
-        if self.dag_root == None {
-            panic!("Should not be accessing the heap with an invalid index (heap is empty).");
-        } else if self.dag_root == Some(index) {
+    /// expects (and asserts) `dag_root` to not be empty and `index` to be valid
+    /// asserts that `new_key` is greater or smaller than the old key (depending on the type
+    /// of heap)
+    pub fn change_key(&mut self, index: Index, new_key: T) -> Index {
+        assert_ne!(
+            self.dag_root, None,
+            "Should not be trying to change key on empty heap."
+        );
+        if self.dag_root == Some(index) {
             // the changed value is the root so will be updated in-place
             let ref mut node = self.dag[index];
             assert!(
-                (self.compare)(&new_val, &node.key),
+                (self.compare)(&new_key, &node.key),
                 "only allow increasing keys to greater values"
             );
-            node.item = Some(new_val);
-            node.key = new_val.into();
-            index
-        } else {
-            // the changed value is not the root and thus will become hollow
-            let (new_index, rank) = {
-                let node = self
-                    .dag
-                    .get_mut(index)
-                    .expect("Should not be accessing the heap with an invalid index.");
-                assert!(
-                    (self.compare)(&new_val, &node.key),
-                    "only allow increasing keys to greater values"
-                );
-                node.item = None;
-                let rank = node.rank;
-                (self.push(new_val), rank)
-            };
-            let second_parent = {
-                // we created the new index, so this is fine
-                let ref mut new_node = self.dag[new_index];
-                new_node.rank = if rank > 1 { rank - 2 } else { 0 };
-                if self.dag_root == Some(new_index) {
-                    None
-                } else {
-                    new_node.child = Some(index);
-                    Some(new_index)
-                }
-            };
-            // the expect above guarantees that this access is valid
-            self.dag[index].second_parent = second_parent;
-            new_index
+            node.item = Some(new_key);
+            node.key = new_key.into();
+            return index;
         }
+        // the changed value is not the root and thus will become hollow
+        let (new_index, rank) = {
+            let node = self
+                .dag
+                .get_mut(index)
+                .expect("Should not be accessing the heap with an invalid index.");
+            assert!(
+                (self.compare)(&new_key, &node.key),
+                "only allow increasing keys to greater values"
+            );
+            node.item = None;
+            let rank = node.rank;
+            (self.push(new_key), rank)
+        };
+        let second_parent = {
+            // we created the new index, so this is fine
+            let ref mut new_node = self.dag[new_index];
+            new_node.rank = if rank > 1 { rank - 2 } else { 0 };
+            if self.dag_root == Some(new_index) {
+                None
+            } else {
+                new_node.child = Some(index);
+                Some(new_index)
+            }
+        };
+        // the expect above guarantees that this access is valid
+        self.dag[index].second_parent = second_parent;
+        new_index
     }
 
     pub fn peek(&self) -> Option<&T> {
@@ -337,13 +340,13 @@ fn pop_node_min_heap() {
 }
 
 #[test]
-fn increase_key_with_min_heap() {
+fn change_key_with_min_heap() {
     let mut heap: HollowHeap<u16> = HollowHeap::min_heap();
     assert!(heap.is_empty());
     heap.push(5);
     let index = heap.push(42);
     heap.push(4);
-    heap.increase_key(index, 2);
+    heap.change_key(index, 2);
     assert!(heap.pop() == Some(2));
     assert!(heap.pop() == Some(4));
     assert!(heap.pop() == Some(5));
@@ -352,13 +355,13 @@ fn increase_key_with_min_heap() {
 
 #[test]
 #[should_panic]
-fn faulty_increase_key_panics() {
+fn faulty_change_key_panics() {
     let mut heap: HollowHeap<u16> = HollowHeap::min_heap();
     assert!(heap.is_empty());
     heap.push(5);
     let index = heap.push(1);
     heap.push(4);
-    heap.increase_key(index, 2);
+    heap.change_key(index, 2);
 }
 
 #[test]

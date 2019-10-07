@@ -34,7 +34,7 @@ proptest! {
     }
 
     #[test]
-    fn doesnt_crash_with_delete_and_increase_key(vector in vec(u32::arbitrary(), 2..1000)) {
+    fn doesnt_crash_with_delete_and_change_key(vector in vec(u32::arbitrary(), 2..1000)) {
         println!("{:?}", vector);
         let mut heap = HollowHeap::max_heap();
         let mut index = None;
@@ -53,13 +53,13 @@ proptest! {
         let second_index = second_index.unwrap();
 
         let value = *heap.peek().unwrap();
-        heap.increase_key(index, value + 1);
+        heap.change_key(index, value + 1);
         heap.delete(second_index);
         while heap.pop() != None {}
     }
 
     #[test]
-    fn doesnt_crash_with_repeated_delete_and_increase_key(vector in vec(u32::arbitrary(), 2..1000)) {
+    fn doesnt_crash_with_repeated_delete_and_change_key(vector in vec(u32::arbitrary(), 2..1000)) {
         println!("{:?}", vector);
         let mut heap = HollowHeap::max_heap();
         let mut index_values = HashMap::new();
@@ -70,7 +70,7 @@ proptest! {
         }
         for (idx, val) in index_values.iter() {
             if *val < 100 {
-                heap.increase_key(*idx, val * 2 + 1);
+                heap.change_key(*idx, val * 2 + 1);
             } else {
                 heap.delete(*idx);
             }

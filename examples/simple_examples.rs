@@ -64,12 +64,12 @@ fn example_vec() {
 }
 
 fn example_increase() {
-    println!("example_increase (demonstrate the increase_key function)");
+    println!("example_increase (demonstrate the change_key function)");
     let mut heap = HollowHeap::max_heap();
     heap.push(1);
     let second = heap.push(2);
     heap.push(3);
-    heap.increase_key(second, 5); // -> first value should be 5
+    heap.change_key(second, 5); // -> first value should be 5
 
     while let Some(node) = heap.pop() {
         println!("{:?}", node);
@@ -91,14 +91,14 @@ fn example_complicated() {
             }
         }
     }
-    heap.increase_key(five.unwrap(), 777);
+    heap.change_key(five.unwrap(), 777);
     println!("{:?}", heap.pop());
     println!("{:?}", heap.pop());
     let vec2 = vec![2, -55, 67, 110];
     {
         for num in vec2.iter() {
             let index = heap.push(num.clone());
-            heap.increase_key(index, num.clone() + 20);
+            heap.change_key(index, num.clone() + 20);
         }
     }
     while let Some(node) = heap.pop() {
