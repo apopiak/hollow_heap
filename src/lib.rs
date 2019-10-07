@@ -121,6 +121,7 @@ impl<T: Ord + Copy> HollowHeap<T> {
         } else if self.dag_root == Some(index) {
             // the changed value is the root so will be updated in-place
             let ref mut node = self.dag[index];
+            assert!((self.compare)(&new_val, &node.key), "only allow increasing keys to greater values");
             node.item = Some(new_val);
             node.key = new_val.into();
             index
@@ -131,6 +132,7 @@ impl<T: Ord + Copy> HollowHeap<T> {
                     .dag
                     .get_mut(index)
                     .expect("Should not be accessing the heap with an invalid index.");
+                assert!((self.compare)(&new_val, &node.key), "only allow increasing keys to greater values");
                 node.item = None;
                 let rank = node.rank;
                 (self.push(new_val), rank)
@@ -318,4 +320,43 @@ fn pop_node_min_heap() {
     assert!(heap.pop() == Some(8));
     assert!(heap.pop() == Some(9));
     assert!(heap.pop() == None);
+}
+
+#[test]
+fn increase_key_with_min_heap() {
+    let mut heap: HollowHeap<u16> = HollowHeap::min_heap();
+    assert!(heap.is_empty());
+    heap.push(5);
+    let index = heap.push(42);
+    heap.push(4);
+    heap.increase_key(index, 2);
+    assert!(heap.pop() == Some(2));
+    assert!(heap.pop() == Some(4));
+    assert!(heap.pop() == Some(5));
+    assert!(heap.pop() == None);
+}
+
+#[test]
+#[should_panic]
+fn faulty_increase_key_panics() {
+    let mut heap: HollowHeap<u16> = HollowHeap::min_heap();
+    assert!(heap.is_empty());
+    heap.push(5);
+    let index = heap.push(1);
+    heap.push(4);
+    heap.increase_key(index, 2);
+}
+
+#[test]
+fn push_same_values() {
+    let mut heap: HollowHeap<u8> = HollowHeap::max_heap();
+    assert!(heap.is_empty());
+    heap.push(2);
+    heap.push(2);
+    heap.push(1);
+    assert!(!heap.is_empty());
+    assert!(heap.dag.len() == 3);
+    assert!(heap.pop() == Some(2));
+    assert!(heap.pop() == Some(2));
+    assert!(heap.pop() == Some(1));
 }
