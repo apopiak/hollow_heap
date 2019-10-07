@@ -249,6 +249,8 @@ impl<T: Ord + Copy> HollowHeap<T> {
                 }
             });
         }
+        self.dag_root = next_root;
+        // return the index of the next root
         next_root
     }
 
