@@ -1,10 +1,61 @@
+/*!
+A heap with great asymptotic run-time based on the
+[hollow heap paper](https://arxiv.org/abs/1510.06535).
+
+**Note: pre-alpha software unfit for production.**
+
+Extra Note: The hollow heap (at least in this implementation) has high overhead per node because of
+all the book-keeping that needs to be done.
+
+## Why implement it then?
+
+Fun! Also:
+All heap operations in a hollow heap except delete and pop take O(1) time.
+
+## Features
+
+* Zero `unsafe` (by using `generational_arena`)
+
+## Usage
+
+First, add `hollow_heap` to your `Cargo.toml`:
+
+```toml
+[dependencies]
+hollow_heap = "0.3"
+```
+
+Then, import the crate and use the
+[`hollow_heap::HollowHeap`](./struct.HollowHeap.html) type!
+
+```rust
+use hollow_heap::HollowHeap;
+
+let mut heap: HollowHeap<u8> = HollowHeap::max_heap();
+
+// Insert some elements into the heap.
+heap.push(3);
+heap.push(8);
+heap.push(17);
+heap.push(5);
+heap.push(9);
+
+// And we will get the elements back in sorted order when `pop`ing.
+println!("{:?}", heap.pop()); // 17
+println!("{:?}", heap.pop()); // 9
+println!("{:?}", heap.pop()); // 8
+println!("{:?}", heap.pop()); // 5
+println!("{:?}", heap.pop()); // 3
+println!("{:?}", heap.pop()); // None
+
+ */
 use std::cmp;
 use std::collections::VecDeque;
 
 use generational_arena::{Arena, Index};
 
 #[derive(Debug, Clone)]
-pub struct Node<I, V, K> {
+struct Node<I, V, K> {
     index: Option<I>,
     item: Option<V>,
     child: Option<I>,
@@ -15,6 +66,7 @@ pub struct Node<I, V, K> {
 }
 
 impl<T: Ord + Copy> Node<Index, T, T> {
+    /// Note: incomplete because index is not set correctly.
     fn new(item: T) -> Node<Index, T, T> {
         Node {
             index: None,
@@ -65,11 +117,16 @@ impl<T: Ord + Copy> Node<Index, T, T> {
     }
 }
 
+/// The `HollowHeap` allows inserting elements into and removing elements from a heap, returning
+/// the items in the order implied by the chosen compare function. Can be used, for example, as a
+/// priority queue.
+///
+/// [See the module-level documentation for example usage and motivation.](./index.html)
 #[derive(Clone)]
 pub struct HollowHeap<T> {
-    pub dag: Arena<Node<Index, T, T>>,
-    pub dag_root: Option<Index>,
-    compare: fn(&T, &T) -> bool,
+    dag: Arena<Node<Index, T, T>>,
+    dag_root: Option<Index>,
+    pub compare: fn(&T, &T) -> bool,
 }
 
 use std::fmt;
@@ -84,7 +141,24 @@ impl<T: Ord + Copy + fmt::Debug> fmt::Debug for HollowHeap<T> {
 }
 
 impl<T: Ord + Copy> HollowHeap<T> {
-    pub fn new(compare: fn(&T, &T) -> bool) -> HollowHeap<T> {
+    /// Create a new empty heap. Defaults to a min heap.
+    pub fn new() -> HollowHeap<T> {
+        HollowHeap::min_heap()
+    }
+
+    /// Create a new heap with the specified capacity. Defaults to a min heap.
+    ///
+    /// The heap will be able to hold `n` elements without further allocation.
+    pub fn with_capacity(n: usize) -> HollowHeap<T> {
+        HollowHeap {
+            dag: Arena::with_capacity(n),
+            dag_root: None,
+            compare: |lhs, rhs| lhs < rhs,
+        }
+    }
+
+    /// Create a new empty heap with the chosen compare function.
+    pub fn with_compare(compare: fn(&T, &T) -> bool) -> HollowHeap<T> {
         HollowHeap {
             dag: Arena::new(),
             dag_root: None,
@@ -92,18 +166,35 @@ impl<T: Ord + Copy> HollowHeap<T> {
         }
     }
 
+    /// Create a new empty heap with the chosen compare function and the specified capacity.
+    ///
+    /// The heap will be able to hold `n` elements without further allocation.
+    pub fn with_compare_and_capacity(compare: fn(&T, &T) -> bool, n: usize) -> HollowHeap<T> {
+        HollowHeap {
+            dag: Arena::with_capacity(n),
+            dag_root: None,
+            compare,
+        }
+    }
+
+    /// Create a new max heap. (`compare = |lhs, rhs| lhs > rhs`)
     pub fn max_heap() -> HollowHeap<T> {
-        HollowHeap::new(|lhs, rhs| lhs > rhs)
+        HollowHeap::with_compare(|lhs, rhs| lhs > rhs)
     }
 
+    /// Create a new min heap. (`compare = |lhs, rhs| lhs < rhs`)
     pub fn min_heap() -> HollowHeap<T> {
-        HollowHeap::new(|lhs, rhs| lhs < rhs)
+        HollowHeap::with_compare(|lhs, rhs| lhs < rhs)
     }
 
+    /// Test whether there are any elements in the heap.
     pub fn is_empty(&self) -> bool {
         self.dag.len() == 0
     }
 
+    /// Push a value into the heap.
+    ///
+    /// Returns the index of the pushed element.
     pub fn push(&mut self, value: T) -> Index {
         let index = Node::new_in_arena(&mut self.dag, value);
         if let Some(root_index) = self.dag_root {
@@ -116,11 +207,11 @@ impl<T: Ord + Copy> HollowHeap<T> {
         index
     }
 
-    /// increase or decrease the key (used for sorting) of the Node at `index`
+    /// Increase or decrease the key (used for sorting) of the Node at `index`.
     ///
-    /// expects (and asserts) `dag_root` to not be empty and `index` to be valid
-    /// asserts that `new_key` is greater or smaller than the old key (depending on the type
-    /// of heap)
+    /// Expects (and asserts) `dag_root` to not be empty and `index` to be valid.
+    /// Asserts that `new_key` is greater (or smaller) than the old key (depending on the type
+    /// of heap).
     pub fn change_key(&mut self, index: Index, new_key: T) -> Index {
         assert_ne!(
             self.dag_root, None,
@@ -167,12 +258,19 @@ impl<T: Ord + Copy> HollowHeap<T> {
         new_index
     }
 
+    /// Have a look at the top-most value of the heap.
+    ///
+    /// Returns `None` if the heap is empty.
     pub fn peek(&self) -> Option<&T> {
         self.dag_root
             .map(|root_index| self.dag[root_index].item.as_ref())
             .unwrap_or(None)
     }
 
+    /// Remove the value at `index` from the heap.
+    ///
+    /// Returns the new root index if successful and `None` if deletion failed or the heap is empty
+    /// after the operation.
     pub fn delete(&mut self, index: Index) -> Option<Index> {
         if self.dag_root != Some(index) {
             if let Some(node) = self.dag.get_mut(index) {
@@ -267,6 +365,9 @@ impl<T: Ord + Copy> HollowHeap<T> {
         next_root
     }
 
+    /// Remove the top-most value from the heap and return it.
+    ///
+    /// Returns `None` if the heap is empty.
     pub fn pop(&mut self) -> Option<T> {
         let (result, new_root_idx) = self
             .dag_root
