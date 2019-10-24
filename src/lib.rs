@@ -31,7 +31,7 @@ Then, import the crate and use the
 ```rust
 use hollow_heap::HollowHeap;
 
-let mut heap: HollowHeap<u8> = HollowHeap::max_heap();
+let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
 
 // Insert some elements into the heap.
 heap.push(3);
@@ -55,7 +55,7 @@ use std::collections::VecDeque;
 use generational_arena::{Arena, Index};
 
 #[derive(Debug, Clone)]
-struct Node<I, V, K> {
+struct Node<I, K, V> {
     index: Option<I>,
     item: Option<V>,
     child: Option<I>,
@@ -65,35 +65,35 @@ struct Node<I, V, K> {
     rank: usize,
 }
 
-impl<T: Ord + Copy> Node<Index, T, T> {
+impl<K: PartialOrd, V> Node<Index, K, V> {
     /// Note: incomplete because index is not set correctly.
-    fn new(item: T) -> Node<Index, T, T> {
+    fn new(item: V, key: K) -> Node<Index, K, V> {
         Node {
             index: None,
             item: Some(item),
             child: None,
             next: None,
             second_parent: None,
-            key: item,
+            key,
             rank: 0,
         }
     }
 
-    pub fn new_in_arena(arena: &mut Arena<Node<Index, T, T>>, item: T) -> Index {
+    pub fn new_in_arena(arena: &mut Arena<Node<Index, K, V>>, item: V, key: K) -> Index {
         // safe because we assign index later
-        let node = Self::new(item);
+        let node = Self::new(item, key);
         let index = arena.insert(node);
         arena[index].index = Some(index);
         index
     }
 
-    fn add_child(&mut self, new_child: &mut Node<Index, T, T>) -> Index {
+    fn add_child(&mut self, new_child: &mut Node<Index, K, V>) -> Index {
         new_child.next = self.child;
         self.child = Some(new_child.index.unwrap());
         self.index.unwrap()
     }
 
-    fn link(&mut self, other: &mut Self, compare: fn(lhs: &T, rhs: &T) -> bool) -> Index {
+    fn link(&mut self, other: &mut Self, compare: fn(lhs: &K, rhs: &K) -> bool) -> Index {
         if compare(&self.key, &other.key) {
             self.add_child(other)
         } else {
@@ -101,7 +101,7 @@ impl<T: Ord + Copy> Node<Index, T, T> {
         }
     }
 
-    fn ranked_link(&mut self, other: &mut Self, compare: fn(lhs: &T, rhs: &T) -> bool) -> Index {
+    fn ranked_link(&mut self, other: &mut Self, compare: fn(lhs: &K, rhs: &K) -> bool) -> Index {
         assert!(self.rank == other.rank);
         if compare(&self.key, &other.key) {
             self.rank += 1;
@@ -123,14 +123,15 @@ impl<T: Ord + Copy> Node<Index, T, T> {
 ///
 /// [See the module-level documentation for example usage and motivation.](./index.html)
 #[derive(Clone)]
-pub struct HollowHeap<T> {
-    dag: Arena<Node<Index, T, T>>,
+pub struct HollowHeap<K, V> {
+    dag: Arena<Node<Index, K, V>>,
     dag_root: Option<Index>,
-    pub compare: fn(&T, &T) -> bool,
+    pub compare: fn(&K, &K) -> bool,
+    pub derive_key: fn(&V) -> K,
 }
 
 use std::fmt;
-impl<T: Ord + Copy + fmt::Debug> fmt::Debug for HollowHeap<T> {
+impl<T: Ord + Copy + fmt::Debug> fmt::Debug for HollowHeap<T, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -140,51 +141,14 @@ impl<T: Ord + Copy + fmt::Debug> fmt::Debug for HollowHeap<T> {
     }
 }
 
-impl<T: Ord + Copy> HollowHeap<T> {
-    /// Create a new empty heap. Defaults to a min heap.
-    pub fn new() -> HollowHeap<T> {
-        HollowHeap::min_heap()
-    }
-
-    /// Create a new heap with the specified capacity. Defaults to a min heap.
-    ///
-    /// The heap will be able to hold `n` elements without further allocation.
-    pub fn with_capacity(n: usize) -> HollowHeap<T> {
-        HollowHeap {
-            dag: Arena::with_capacity(n),
-            dag_root: None,
-            compare: |lhs, rhs| lhs < rhs,
-        }
-    }
-
-    /// Create a new empty heap with the chosen compare function.
-    pub fn with_compare(compare: fn(&T, &T) -> bool) -> HollowHeap<T> {
+impl<K: PartialOrd + fmt::Debug, V> HollowHeap<K, V> {
+    pub fn new(compare: fn(&K, &K) -> bool, derive_key: fn(&V) -> K) -> HollowHeap<K, V> {
         HollowHeap {
             dag: Arena::new(),
             dag_root: None,
             compare,
+            derive_key,
         }
-    }
-
-    /// Create a new empty heap with the chosen compare function and the specified capacity.
-    ///
-    /// The heap will be able to hold `n` elements without further allocation.
-    pub fn with_compare_and_capacity(compare: fn(&T, &T) -> bool, n: usize) -> HollowHeap<T> {
-        HollowHeap {
-            dag: Arena::with_capacity(n),
-            dag_root: None,
-            compare,
-        }
-    }
-
-    /// Create a new max heap. (`compare = |lhs, rhs| lhs > rhs`)
-    pub fn max_heap() -> HollowHeap<T> {
-        HollowHeap::with_compare(|lhs, rhs| lhs > rhs)
-    }
-
-    /// Create a new min heap. (`compare = |lhs, rhs| lhs < rhs`)
-    pub fn min_heap() -> HollowHeap<T> {
-        HollowHeap::with_compare(|lhs, rhs| lhs < rhs)
     }
 
     /// Test whether there are any elements in the heap.
@@ -195,8 +159,13 @@ impl<T: Ord + Copy> HollowHeap<T> {
     /// Push a value into the heap.
     ///
     /// Returns the index of the pushed element.
-    pub fn push(&mut self, value: T) -> Index {
-        let index = Node::new_in_arena(&mut self.dag, value);
+    pub fn push(&mut self, value: V) -> Index {
+        let key = (self.derive_key)(&value);
+        self.push_with_key(value, key)
+    }
+
+    pub fn push_with_key(&mut self, value: V, key: K) -> Index {
+        let index = Node::new_in_arena(&mut self.dag, value, key);
         if let Some(root_index) = self.dag_root {
             let (root, node) = self.dag.get2_mut(root_index, index);
             // unwrap should be safe because these indices come from inside the dag
@@ -209,41 +178,75 @@ impl<T: Ord + Copy> HollowHeap<T> {
 
     /// Increase or decrease the key (used for sorting) of the Node at `index`.
     ///
+    /// **Note:** This function only changes the key, not the item.
+    ///
     /// Expects (and asserts) `dag_root` to not be empty and `index` to be valid.
     /// Asserts that `new_key` is greater (or smaller) than the old key (depending on the type
     /// of heap).
-    pub fn change_key(&mut self, index: Index, new_key: T) -> Index {
+    pub fn change_key(&mut self, index: Index, new_key: K) -> Index {
+        self.update(index, None, new_key.into())
+    }
+
+    pub fn change_item(&mut self, index: Index, new_item: V) -> Index {
+        self.update(index, new_item.into(), None)
+    }
+
+    fn update(&mut self, index: Index, new_item: Option<V>, new_key: Option<K>) -> Index {
         assert_ne!(
             self.dag_root, None,
             "Should not be trying to change key on empty heap."
         );
+        let ref item_ref = &new_item;
+        let new_key = new_key.unwrap_or_else(|| {
+            (self.derive_key)(
+                item_ref
+                    .as_ref()
+                    .expect("Need either a new item or a new key to update."),
+            )
+        });
         if self.dag_root == Some(index) {
             // the changed value is the root so will be updated in-place
             let ref mut node = self.dag[index];
             assert!(
                 (self.compare)(&new_key, &node.key),
-                "only allow increasing keys to greater values"
+                format!("Should only increase key to 'better' value. '{:?}' is not 'better' than '{:?}'", new_key, node.key)
             );
-            node.item = Some(new_key);
+            if let Some(item) = new_item {
+                node.item = Some(item);
+            }
             node.key = new_key.into();
             return index;
         }
         // the changed value is not the root and thus will become hollow
-        let (new_index, rank) = {
-            let node = self
-                .dag
-                .get_mut(index)
-                .expect("Should not be accessing the heap with an invalid index.");
-            assert!(
-                (self.compare)(&new_key, &node.key),
-                "only allow increasing keys to greater values"
-            );
-            node.item = None;
-            let rank = node.rank;
-            (self.push(new_key), rank)
+        // let (new_index, rank) = {
+        let node = self
+            .dag
+            .get_mut(index)
+            .expect("Should not be accessing the heap with an invalid index.");
+        assert!(
+            (self.compare)(&new_key, &node.key),
+            format!(
+                "Should only increase key to 'better' value. '{:?}' is not 'better' than '{:?}'",
+                new_key, node.key
+            )
+        );
+        let item = {
+            let old_item = node
+                .item
+                .take()
+                .expect("Should not be changing the key of an item twice.");
+            if let Some(item) = new_item {
+                item
+            } else {
+                old_item
+            }
         };
+        let rank = node.rank;
+
+        // };
+        let new_index = self.push_with_key(item, new_key);
         let second_parent = {
-            // we created the new index, so this is fine
+            // we created a node and got the new index, so this access is fine
             let ref mut new_node = self.dag[new_index];
             new_node.rank = if rank > 1 { rank - 2 } else { 0 };
             if self.dag_root == Some(new_index) {
@@ -253,7 +256,7 @@ impl<T: Ord + Copy> HollowHeap<T> {
                 Some(new_index)
             }
         };
-        // the expect above guarantees that this access is valid
+        // `index` is assumed valid; the expect above guarantees that this is the case
         self.dag[index].second_parent = second_parent;
         new_index
     }
@@ -261,7 +264,7 @@ impl<T: Ord + Copy> HollowHeap<T> {
     /// Have a look at the top-most value of the heap.
     ///
     /// Returns `None` if the heap is empty.
-    pub fn peek(&self) -> Option<&T> {
+    pub fn peek(&self) -> Option<&V> {
         self.dag_root
             .map(|root_index| self.dag[root_index].item.as_ref())
             .unwrap_or(None)
@@ -368,7 +371,7 @@ impl<T: Ord + Copy> HollowHeap<T> {
     /// Remove the top-most value from the heap and return it.
     ///
     /// Returns `None` if the heap is empty.
-    pub fn pop(&mut self) -> Option<T> {
+    pub fn pop(&mut self) -> Option<V> {
         let (result, new_root_idx) = self
             .dag_root
             .map(|root_index| {
@@ -381,15 +384,61 @@ impl<T: Ord + Copy> HollowHeap<T> {
     }
 }
 
+impl<T: PartialOrd + Copy> HollowHeap<T, T> {
+    /// Create a new heap with the specified capacity. Defaults to a min heap.
+    ///
+    /// The heap will be able to hold `n` elements without further allocation.
+    pub fn with_capacity(n: usize) -> HollowHeap<T, T> {
+        HollowHeap {
+            dag: Arena::with_capacity(n),
+            dag_root: None,
+            compare: |lhs, rhs| lhs < rhs,
+            derive_key: |value| *value,
+        }
+    }
+
+    /// Create a new empty heap with the chosen compare function.
+    pub fn with_compare(compare: fn(&T, &T) -> bool) -> HollowHeap<T, T> {
+        HollowHeap {
+            dag: Arena::new(),
+            dag_root: None,
+            compare,
+            derive_key: |value| *value,
+        }
+    }
+
+    /// Create a new empty heap with the chosen compare function and the specified capacity.
+    ///
+    /// The heap will be able to hold `n` elements without further allocation.
+    pub fn with_compare_and_capacity(compare: fn(&T, &T) -> bool, n: usize) -> HollowHeap<T, T> {
+        HollowHeap {
+            dag: Arena::with_capacity(n),
+            dag_root: None,
+            compare,
+            derive_key: |value| *value,
+        }
+    }
+
+    /// Create a new max heap. (`compare = |lhs, rhs| lhs > rhs`)
+    pub fn max_heap() -> HollowHeap<T, T> {
+        HollowHeap::with_compare(|lhs, rhs| lhs > rhs)
+    }
+
+    /// Create a new min heap. (`compare = |lhs, rhs| lhs < rhs`)
+    pub fn min_heap() -> HollowHeap<T, T> {
+        HollowHeap::with_compare(|lhs, rhs| lhs < rhs)
+    }
+}
+
 #[test]
 fn new_heap_is_empty() {
-    let heap: HollowHeap<u8> = HollowHeap::max_heap();
+    let heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
     assert!(heap.is_empty());
 }
 
 #[test]
 fn push_nodes() {
-    let mut heap: HollowHeap<u8> = HollowHeap::max_heap();
+    let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
     assert!(heap.is_empty());
     heap.push(2);
     heap.push(5);
@@ -399,7 +448,7 @@ fn push_nodes() {
 
 #[test]
 fn peek_node() {
-    let mut heap: HollowHeap<u8> = HollowHeap::max_heap();
+    let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
     assert!(heap.is_empty());
     heap.push(2);
     heap.push(4);
@@ -408,7 +457,7 @@ fn peek_node() {
 
 #[test]
 fn pop_node_max_heap() {
-    let mut heap: HollowHeap<u8> = HollowHeap::max_heap();
+    let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
     assert!(heap.is_empty());
     heap.push(2);
     heap.push(8);
@@ -425,7 +474,7 @@ fn pop_node_max_heap() {
 
 #[test]
 fn pop_node_min_heap() {
-    let mut heap: HollowHeap<u8> = HollowHeap::min_heap();
+    let mut heap: HollowHeap<u8, u8> = HollowHeap::min_heap();
     assert!(heap.is_empty());
     heap.push(2);
     heap.push(8);
@@ -442,12 +491,26 @@ fn pop_node_min_heap() {
 
 #[test]
 fn change_key_with_min_heap() {
-    let mut heap: HollowHeap<u16> = HollowHeap::min_heap();
+    let mut heap: HollowHeap<u16, u16> = HollowHeap::min_heap();
     assert!(heap.is_empty());
     heap.push(5);
     let index = heap.push(42);
     heap.push(4);
     heap.change_key(index, 2);
+    assert!(heap.pop() == Some(42));
+    assert!(heap.pop() == Some(4));
+    assert!(heap.pop() == Some(5));
+    assert!(heap.pop() == None);
+}
+
+#[test]
+fn change_item_with_min_heap() {
+    let mut heap: HollowHeap<u16, u16> = HollowHeap::min_heap();
+    assert!(heap.is_empty());
+    heap.push(5);
+    let index = heap.push(42);
+    heap.push(4);
+    heap.change_item(index, 2);
     assert!(heap.pop() == Some(2));
     assert!(heap.pop() == Some(4));
     assert!(heap.pop() == Some(5));
@@ -457,7 +520,7 @@ fn change_key_with_min_heap() {
 #[test]
 #[should_panic]
 fn faulty_change_key_panics() {
-    let mut heap: HollowHeap<u16> = HollowHeap::min_heap();
+    let mut heap: HollowHeap<u16, u16> = HollowHeap::min_heap();
     assert!(heap.is_empty());
     heap.push(5);
     let index = heap.push(1);
@@ -467,7 +530,7 @@ fn faulty_change_key_panics() {
 
 #[test]
 fn push_same_values() {
-    let mut heap: HollowHeap<u8> = HollowHeap::max_heap();
+    let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
     assert!(heap.is_empty());
     heap.push(2);
     heap.push(2);
@@ -477,4 +540,27 @@ fn push_same_values() {
     assert!(heap.pop() == Some(2));
     assert!(heap.pop() == Some(2));
     assert!(heap.pop() == Some(1));
+}
+
+#[derive(PartialEq, Eq)]
+struct SomeStruct {
+    some_value: u32,
+}
+
+#[test]
+fn different_key_from_value() {
+    let mut heap: HollowHeap<u32, &SomeStruct> =
+        HollowHeap::new(|lhs, rhs| lhs > rhs, |val| val.some_value);
+    assert!(heap.is_empty());
+    let first = SomeStruct { some_value: 2 };
+    heap.push(&first);
+    let second = SomeStruct { some_value: 3 };
+    heap.push(&second);
+    let third = SomeStruct { some_value: 1 };
+    heap.push(&third);
+    assert!(!heap.is_empty());
+    assert!(heap.dag.len() == 3);
+    assert!(heap.pop() == Some(&second));
+    assert!(heap.pop() == Some(&first));
+    assert!(heap.pop() == Some(&third));
 }

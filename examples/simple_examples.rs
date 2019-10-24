@@ -6,7 +6,7 @@ fn example_one() {
     println!(
         "example_one (heap returns the pushed elements in sorted - greatest to smallest - order and then returns None)"
     );
-    let mut heap: HollowHeap<u8> = HollowHeap::max_heap();
+    let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
     heap.push(3);
     heap.push(8);
     heap.push(17);
@@ -25,7 +25,7 @@ fn example_min_heap() {
     println!(
         "example_one (heap returns the pushed elements in sorted - smalles to greatest - order and then returns None)"
     );
-    let mut heap: HollowHeap<u8> = HollowHeap::min_heap();
+    let mut heap: HollowHeap<u8, u8> = HollowHeap::min_heap();
     heap.push(3);
     heap.push(8);
     heap.push(17);
