@@ -117,6 +117,14 @@ impl<K: PartialOrd, V> Node<Index, K, V> {
     }
 }
 
+pub fn min_heap_compare<K: PartialOrd>(lhs: &K, rhs: &K) -> bool {
+    lhs < rhs
+}
+
+pub fn max_heap_compare<K: PartialOrd>(lhs: &K, rhs: &K) -> bool {
+    lhs > rhs
+}
+
 /// The `HollowHeap` allows inserting elements into and removing elements from a heap, returning
 /// the items in the order implied by the chosen compare function. Can be used, for example, as a
 /// priority queue.
@@ -187,6 +195,11 @@ impl<K: PartialOrd + fmt::Debug, V> HollowHeap<K, V> {
         self.update(index, None, new_key.into())
     }
 
+    /// Change the item (and recalculate the key) of the Node at `index`.
+    ///
+    /// Expects (and asserts) `dag_root` to not be empty and `index` to be valid.
+    /// Asserts that the new generated key is greater (or smaller) than the old key (depending on
+    /// the type of heap).
     pub fn change_item(&mut self, index: Index, new_item: V) -> Index {
         self.update(index, new_item.into(), None)
     }
@@ -392,7 +405,7 @@ impl<T: PartialOrd + Copy> HollowHeap<T, T> {
         HollowHeap {
             dag: Arena::with_capacity(n),
             dag_root: None,
-            compare: |lhs, rhs| lhs < rhs,
+            compare: min_heap_compare,
             derive_key: |value| *value,
         }
     }
@@ -421,12 +434,12 @@ impl<T: PartialOrd + Copy> HollowHeap<T, T> {
 
     /// Create a new max heap. (`compare = |lhs, rhs| lhs > rhs`)
     pub fn max_heap() -> HollowHeap<T, T> {
-        HollowHeap::with_compare(|lhs, rhs| lhs > rhs)
+        HollowHeap::with_compare(max_heap_compare)
     }
 
     /// Create a new min heap. (`compare = |lhs, rhs| lhs < rhs`)
     pub fn min_heap() -> HollowHeap<T, T> {
-        HollowHeap::with_compare(|lhs, rhs| lhs < rhs)
+        HollowHeap::with_compare(min_heap_compare)
     }
 }
 
@@ -540,6 +553,7 @@ fn push_same_values() {
     assert!(heap.pop() == Some(2));
     assert!(heap.pop() == Some(2));
     assert!(heap.pop() == Some(1));
+    assert!(heap.pop() == None);
 }
 
 #[derive(PartialEq, Eq)]
@@ -563,4 +577,104 @@ fn different_key_from_value() {
     assert!(heap.pop() == Some(&second));
     assert!(heap.pop() == Some(&first));
     assert!(heap.pop() == Some(&third));
+    assert!(heap.pop() == None);
+}
+
+#[test]
+fn change_item_with_complex_value() {
+    let mut heap: HollowHeap<u32, &SomeStruct> =
+        HollowHeap::new(|lhs, rhs| lhs < rhs, |val| val.some_value);
+    assert!(heap.is_empty());
+    let first = SomeStruct { some_value: 42 };
+    let index = heap.push(&first);
+    let second = SomeStruct { some_value: 3 };
+    heap.push(&second);
+    let third = SomeStruct { some_value: 1 };
+    heap.push(&third);
+    let changed = SomeStruct { some_value: 2};
+    heap.change_item(index, &changed);
+    assert!(!heap.is_empty());
+    assert!(heap.pop() == Some(&third));
+    assert!(heap.pop() == Some(&changed));
+    assert!(heap.pop() == Some(&second));
+    assert!(heap.pop() == None);
+}
+
+#[derive(Clone)]
+pub struct HollowHeapBuilder<K, V> {
+    capacity: Option<usize>,
+    compare: fn(&K, &K) -> bool,
+    derive_key: fn(&V) -> K,
+}
+
+impl<K: PartialOrd, V> HollowHeapBuilder<K, V> {
+    pub fn new(derive_key: fn(&V) -> K) -> HollowHeapBuilder<K, V> {
+        HollowHeapBuilder {
+            capacity: None,
+            compare: min_heap_compare,
+            derive_key
+        }
+    }
+
+    pub fn with_capacity(&mut self, n: usize) -> &mut HollowHeapBuilder<K, V> {
+        self.capacity = Some(n);
+        self
+    }
+
+    pub fn with_compare(&mut self, compare: fn(&K, &K) -> bool) -> &mut HollowHeapBuilder<K, V> {
+        self.compare = compare;
+        self
+    }
+
+    pub fn min_heap(&mut self) -> &mut HollowHeapBuilder<K, V> {
+        self.compare = min_heap_compare;
+        self
+    }
+
+    pub fn max_heap(&mut self) -> &mut HollowHeapBuilder<K, V> {
+        self.compare = max_heap_compare;
+        self
+    }
+
+    pub fn build(&self) -> HollowHeap<K, V> {
+        if let Some(capacity) = self.capacity {
+            HollowHeap {
+                dag: Arena::with_capacity(capacity),
+                dag_root: None,
+                compare: self.compare,
+                derive_key: self.derive_key,
+            }
+        } else {
+            HollowHeap {
+                dag: Arena::new(),
+                dag_root: None,
+                compare: self.compare,
+                derive_key: self.derive_key,
+            }
+        }
+    }
+}
+
+impl<T: PartialOrd + Copy> HollowHeapBuilder<T, T> {
+    pub fn new_with_value_is_key() -> HollowHeapBuilder<T, T> {
+        HollowHeapBuilder {
+            capacity: None,
+            compare: min_heap_compare,
+            derive_key: |value| *value,
+        }
+    }
+}
+
+#[test]
+fn builder_builds_heap() {
+    let mut builder = HollowHeapBuilder::new(|st:&SomeStruct| st.some_value);
+    let mut heap = builder.with_compare(|lhs, rhs| lhs < rhs).with_capacity(5).build();
+    heap.push(SomeStruct{ some_value: 50});
+    heap.push(SomeStruct{ some_value: 40});
+    heap.push(SomeStruct{ some_value: 30});
+
+    assert!(heap.pop() == Some(SomeStruct{ some_value: 30}));
+    assert!(heap.pop() == Some(SomeStruct{ some_value: 40}));
+    assert!(heap.pop() == Some(SomeStruct{ some_value: 50}));
+    assert!(heap.pop() == None);
 }

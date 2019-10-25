@@ -77,4 +77,27 @@ proptest! {
         }
         while heap.pop() != None {}
     }
+
+    #[test]
+    fn doesnt_crash_with_repeated_operations(vector in vec(u32::arbitrary(), 2..1000)) {
+        println!("{:?}", vector);
+        let mut heap: HollowHeap<u32, u32> =
+            HollowHeap::new(|lhs, rhs| lhs > rhs, |val| *val);
+        let mut index_values = HashMap::new();
+        for num in vector.iter() {
+            let val = *num;
+            let idx = heap.push(*num);
+            index_values.insert(idx, val);
+        }
+        for (idx, val) in index_values.iter() {
+            if *val < 100 {
+                heap.change_key(*idx, val * 2 + 1);
+            } else if *val < 300 {
+                heap.change_item(*idx, val * 3 + 2);
+            } else {
+                heap.delete(*idx);
+            }
+        }
+        while heap.pop() != None {}
+    }
 }
