@@ -667,8 +667,10 @@ impl<T: PartialOrd + Copy> HollowHeapBuilder<T, T> {
 
 #[test]
 fn builder_builds_heap() {
+    let capacity = 5;
     let mut builder = HollowHeapBuilder::new(|st:&SomeStruct| st.some_value);
-    let mut heap = builder.with_compare(|lhs, rhs| lhs < rhs).with_capacity(5).build();
+    let mut heap = builder.with_compare(|lhs, rhs| lhs < rhs).with_capacity(capacity).build();
+    assert!(heap.dag.capacity() == capacity);
     heap.push(SomeStruct{ some_value: 50});
     heap.push(SomeStruct{ some_value: 40});
     heap.push(SomeStruct{ some_value: 30});
