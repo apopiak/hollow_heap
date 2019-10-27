@@ -1,6 +1,6 @@
 extern crate hollow_heap;
 
-use hollow_heap::HollowHeap;
+use hollow_heap::{HollowHeap, HollowHeapBuilder};
 
 fn example_one() {
     println!(
@@ -107,10 +107,28 @@ fn example_complicated() {
     println!("");
 }
 
+fn example_builder() {
+    println!("example_builder (demonstrating the builder)");
+    let mut heap: HollowHeap<f32, u16> =
+        HollowHeapBuilder::new(|uint: &u16| f32::from(*uint) + 0.5)
+            .with_compare(|lhs, rhs| lhs < rhs)
+            .with_capacity(100)
+            .build();
+    heap.push(42);
+    heap.push(21);
+    heap.push(1);
+
+    println!("{:?}", heap.pop()); // 1
+    println!("{:?}", heap.pop()); // 21
+    println!("{:?}", heap.pop()); // 42
+    println!("{:?}", heap.pop()); // None
+}
+
 fn main() {
     example_one();
     example_min_heap();
     example_vec();
     example_increase();
     example_complicated();
+    example_builder();
 }
