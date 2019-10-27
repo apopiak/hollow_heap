@@ -694,3 +694,47 @@ fn builder_builds_heap() {
     assert!(heap.pop() == Some(SomeStruct { some_value: 50 }));
     assert!(heap.pop() == None);
 }
+
+impl<K: PartialOrd + fmt::Debug, V> IntoIterator for HollowHeap<K, V> {
+    type Item = V;
+    type IntoIter = IntoIter<K, V>;
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter { inner: self }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct IntoIter<K, V> {
+    inner: HollowHeap<K, V>,
+}
+
+impl<K: PartialOrd + fmt::Debug, V> Iterator for IntoIter<K, V> {
+    type Item = V;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.pop()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.inner.dag.len();
+        (len, Some(len))
+    }
+}
+
+#[test]
+fn iterator_returns_sorted_items() {
+    let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
+    assert!(heap.is_empty());
+    heap.push(2);
+    heap.push(8);
+    heap.push(4);
+    heap.push(9);
+    heap.push(1);
+    let mut iter = heap.into_iter();
+    assert!(iter.next() == Some(9));
+    assert!(iter.next() == Some(8));
+    assert!(iter.next() == Some(4));
+    assert!(iter.next() == Some(2));
+    assert!(iter.next() == Some(1));
+    assert!(iter.next() == None);
+}
