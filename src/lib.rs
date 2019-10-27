@@ -54,6 +54,11 @@ use std::collections::VecDeque;
 
 use generational_arena::{Arena, Index};
 
+/// A node in a hollow heap.
+///
+/// `item` holds the value.
+/// `key` is used for comparison.
+/// Hollow nodes are represented by setting `item` to `None`.
 #[derive(Debug, Clone)]
 struct Node<I, K, V> {
     index: Option<I>,
@@ -62,7 +67,13 @@ struct Node<I, K, V> {
     next: Option<I>,
     second_parent: Option<I>,
     key: K,
-    rank: usize,
+    /// Quote from the [hollow heap paper](https://arxiv.org/abs/1510.06535):
+    /// > The rank of a node in a [...] hollow heap of `N` nodes is at most `logφN` (logarithm of N
+    /// with the golden ratio)
+    ///
+    /// This means that the rank in a hollow heap whose size is limited by `usize` is never greater
+    /// than `logφ(usize::max_value) = 92.18688578640361` and thus fits in a `u8`.
+    rank: u8,
 }
 
 impl<K: PartialOrd, V> Node<Index, K, V> {
@@ -139,7 +150,7 @@ pub struct HollowHeap<K, V> {
 }
 
 use std::fmt;
-impl<T: Ord + Copy + fmt::Debug> fmt::Debug for HollowHeap<T, T> {
+impl<K: fmt::Debug, V: fmt::Debug> fmt::Debug for HollowHeap<K, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -340,25 +351,25 @@ impl<K: PartialOrd + fmt::Debug, V> HollowHeap<K, V> {
                 } else {
                     let mut cur_child_idx = child_idx;
                     let mut rank = self.dag[cur_child_idx].rank;
-                    if rank >= roots_by_rank.len() {
-                        roots_by_rank.resize(rank + 1, None);
+                    if rank as usize >= roots_by_rank.len() {
+                        roots_by_rank.resize((rank + 1) as usize, None);
                     }
-                    while let Some(index) = roots_by_rank[rank] {
+                    while let Some(index) = roots_by_rank[rank as usize] {
                         let (first_node, second_node) = self.dag.get2_mut(index, cur_child_idx);
                         // unwrap should be safe because these indices come from inside the dag
                         cur_child_idx = first_node
                             .unwrap()
                             .ranked_link(&mut second_node.unwrap(), self.compare);
-                        roots_by_rank[rank] = None;
+                        roots_by_rank[rank as usize] = None;
                         rank = rank + 1;
-                        if rank >= roots_by_rank.len() {
+                        if rank as usize >= roots_by_rank.len() {
                             roots_by_rank.push(None);
                         }
                     }
                     // the ranked_link increased the rank
                     max_rank = cmp::max(rank, max_rank);
-                    roots_by_rank.resize(max_rank + 1, None);
-                    roots_by_rank[rank] = Some(cur_child_idx);
+                    roots_by_rank.resize((max_rank + 1) as usize, None);
+                    roots_by_rank[rank as usize] = Some(cur_child_idx);
                 }
             }
             next_root.map(|next_index| queue.push_back(next_index));
@@ -591,7 +602,7 @@ fn change_item_with_complex_value() {
     heap.push(&second);
     let third = SomeStruct { some_value: 1 };
     heap.push(&third);
-    let changed = SomeStruct { some_value: 2};
+    let changed = SomeStruct { some_value: 2 };
     heap.change_item(index, &changed);
     assert!(!heap.is_empty());
     assert!(heap.pop() == Some(&third));
@@ -612,7 +623,7 @@ impl<K: PartialOrd, V> HollowHeapBuilder<K, V> {
         HollowHeapBuilder {
             capacity: None,
             compare: min_heap_compare,
-            derive_key
+            derive_key,
         }
     }
 
@@ -668,15 +679,18 @@ impl<T: PartialOrd + Copy> HollowHeapBuilder<T, T> {
 #[test]
 fn builder_builds_heap() {
     let capacity = 5;
-    let mut builder = HollowHeapBuilder::new(|st:&SomeStruct| st.some_value);
-    let mut heap = builder.with_compare(|lhs, rhs| lhs < rhs).with_capacity(capacity).build();
+    let mut builder = HollowHeapBuilder::new(|st: &SomeStruct| st.some_value);
+    let mut heap = builder
+        .with_compare(|lhs, rhs| lhs < rhs)
+        .with_capacity(capacity)
+        .build();
     assert!(heap.dag.capacity() == capacity);
-    heap.push(SomeStruct{ some_value: 50});
-    heap.push(SomeStruct{ some_value: 40});
-    heap.push(SomeStruct{ some_value: 30});
+    heap.push(SomeStruct { some_value: 50 });
+    heap.push(SomeStruct { some_value: 40 });
+    heap.push(SomeStruct { some_value: 30 });
 
-    assert!(heap.pop() == Some(SomeStruct{ some_value: 30}));
-    assert!(heap.pop() == Some(SomeStruct{ some_value: 40}));
-    assert!(heap.pop() == Some(SomeStruct{ some_value: 50}));
+    assert!(heap.pop() == Some(SomeStruct { some_value: 30 }));
+    assert!(heap.pop() == Some(SomeStruct { some_value: 40 }));
+    assert!(heap.pop() == Some(SomeStruct { some_value: 50 }));
     assert!(heap.pop() == None);
 }
