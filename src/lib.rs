@@ -10,7 +10,7 @@ all the book-keeping that needs to be done.
 ## Why implement it then?
 
 Fun! Also:
-All heap operations in a hollow heap except delete and pop take O(1) time.
+All heap operations in a hollow heap except `delete` and `pop` take O(1) time.
 
 ## Features
 
@@ -22,7 +22,7 @@ First, add `hollow_heap` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hollow_heap = "0.3"
+hollow_heap = "0.5"
 ```
 
 Then, import the crate and use the
@@ -47,7 +47,26 @@ println!("{:?}", heap.pop()); // 8
 println!("{:?}", heap.pop()); // 5
 println!("{:?}", heap.pop()); // 3
 println!("{:?}", heap.pop()); // None
+```
 
+Feel free to use the [`hollow_heap::HollowHeapBuilder`](./struct.HollowHeapBuilder.html) type to
+configure your `HollowHeap` in a flexible way. A contrived example:
+```rust
+use hollow_heap::{HollowHeap, HollowHeapBuilder};
+
+let mut heap: HollowHeap<f32, u16> = HollowHeapBuilder::new(|uint:&u16| f32::from(*uint) + 0.5)
+    .with_compare(|lhs, rhs| lhs < rhs)
+    .with_capacity(100)
+    .build();
+heap.push(42);
+heap.push(21);
+heap.push(1);
+
+println!("{:?}", heap.pop()); // 1
+println!("{:?}", heap.pop()); // 21
+println!("{:?}", heap.pop()); // 42
+println!("{:?}", heap.pop()); // None
+```
  */
 use std::cmp;
 use std::collections::VecDeque;
@@ -611,6 +630,8 @@ fn change_item_with_complex_value() {
     assert!(heap.pop() == None);
 }
 
+/// A builder to construct a [`HollowHeap`](./struct.HollowHeap.html).
+/// Allows specifying key derivation and compare functions as well as capacity.
 #[derive(Clone)]
 pub struct HollowHeapBuilder<K, V> {
     capacity: Option<usize>,
@@ -619,6 +640,10 @@ pub struct HollowHeapBuilder<K, V> {
 }
 
 impl<K: PartialOrd, V> HollowHeapBuilder<K, V> {
+    /// Create a new HollowHeapBuilder to configure and build a HollowHeap.
+    ///
+    /// Every HollowHeap needs a `derive_key` function. Consider `|val| *val` for trivial values
+    /// (like `u32` or `f64`).
     pub fn new(derive_key: fn(&V) -> K) -> HollowHeapBuilder<K, V> {
         HollowHeapBuilder {
             capacity: None,
@@ -627,26 +652,32 @@ impl<K: PartialOrd, V> HollowHeapBuilder<K, V> {
         }
     }
 
+    /// Specify the capacity of the heap. The heap will not allocate for the first `n` elements
+    /// pushed into it.
     pub fn with_capacity(&mut self, n: usize) -> &mut HollowHeapBuilder<K, V> {
         self.capacity = Some(n);
         self
     }
 
+    /// Specify the compare function to use.
     pub fn with_compare(&mut self, compare: fn(&K, &K) -> bool) -> &mut HollowHeapBuilder<K, V> {
         self.compare = compare;
         self
     }
 
+    /// Set the compare function in the way to get a min heap.
     pub fn min_heap(&mut self) -> &mut HollowHeapBuilder<K, V> {
         self.compare = min_heap_compare;
         self
     }
 
+    /// Set the compare function in the way to get a max heap.
     pub fn max_heap(&mut self) -> &mut HollowHeapBuilder<K, V> {
         self.compare = max_heap_compare;
         self
     }
 
+    /// Finish constructing the HollowHeap and return it.
     pub fn build(&self) -> HollowHeap<K, V> {
         if let Some(capacity) = self.capacity {
             HollowHeap {
