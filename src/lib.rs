@@ -147,10 +147,12 @@ impl<K: PartialOrd, V> Node<Index, K, V> {
     }
 }
 
+/// The comparison function used for the min heap.
 pub fn min_heap_compare<K: PartialOrd>(lhs: &K, rhs: &K) -> bool {
     lhs < rhs
 }
 
+/// The comparison function used for the max heap.
 pub fn max_heap_compare<K: PartialOrd>(lhs: &K, rhs: &K) -> bool {
     lhs > rhs
 }
@@ -202,6 +204,9 @@ impl<K: PartialOrd + fmt::Debug, V> HollowHeap<K, V> {
         self.push_with_key(value, key)
     }
 
+    /// Push a value into the heap with the provided key.
+    ///
+    /// Circumvents the `derive_key` function and is thus not recommended.
     pub fn push_with_key(&mut self, value: V, key: K) -> Index {
         let index = Node::new_in_arena(&mut self.dag, value, key);
         if let Some(root_index) = self.dag_root {
@@ -473,161 +478,167 @@ impl<T: PartialOrd + Copy> HollowHeap<T, T> {
     }
 }
 
-#[test]
-fn new_heap_is_empty() {
-    let heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
-    assert!(heap.is_empty());
-}
+#[cfg(test)]
+mod tests {
+    use super::HollowHeap;
 
-#[test]
-fn push_nodes() {
-    let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
-    assert!(heap.is_empty());
-    heap.push(2);
-    heap.push(5);
-    assert!(!heap.is_empty());
-    assert!(heap.dag.len() == 2);
-}
+    #[test]
+    fn new_heap_is_empty() {
+        let heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
+        assert!(heap.is_empty());
+    }
 
-#[test]
-fn peek_node() {
-    let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
-    assert!(heap.is_empty());
-    heap.push(2);
-    heap.push(4);
-    assert!(heap.peek() == Some(&4));
-}
+    #[test]
+    fn push_nodes() {
+        let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
+        assert!(heap.is_empty());
+        heap.push(2);
+        heap.push(5);
+        assert!(!heap.is_empty());
+        assert!(heap.dag.len() == 2);
+    }
 
-#[test]
-fn pop_node_max_heap() {
-    let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
-    assert!(heap.is_empty());
-    heap.push(2);
-    heap.push(8);
-    heap.push(4);
-    heap.push(9);
-    heap.push(1);
-    assert!(heap.pop() == Some(9));
-    assert!(heap.pop() == Some(8));
-    assert!(heap.pop() == Some(4));
-    assert!(heap.pop() == Some(2));
-    assert!(heap.pop() == Some(1));
-    assert!(heap.pop() == None);
-}
+    #[test]
+    fn peek_node() {
+        let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
+        assert!(heap.is_empty());
+        heap.push(2);
+        heap.push(4);
+        assert!(heap.peek() == Some(&4));
+    }
 
-#[test]
-fn pop_node_min_heap() {
-    let mut heap: HollowHeap<u8, u8> = HollowHeap::min_heap();
-    assert!(heap.is_empty());
-    heap.push(2);
-    heap.push(8);
-    heap.push(4);
-    heap.push(9);
-    heap.push(1);
-    assert!(heap.pop() == Some(1));
-    assert!(heap.pop() == Some(2));
-    assert!(heap.pop() == Some(4));
-    assert!(heap.pop() == Some(8));
-    assert!(heap.pop() == Some(9));
-    assert!(heap.pop() == None);
-}
+    #[test]
+    fn pop_node_max_heap() {
+        let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
+        assert!(heap.is_empty());
+        heap.push(2);
+        heap.push(8);
+        heap.push(4);
+        heap.push(9);
+        heap.push(1);
+        assert!(heap.pop() == Some(9));
+        assert!(heap.pop() == Some(8));
+        assert!(heap.pop() == Some(4));
+        assert!(heap.pop() == Some(2));
+        assert!(heap.pop() == Some(1));
+        assert!(heap.pop() == None);
+    }
 
-#[test]
-fn change_key_with_min_heap() {
-    let mut heap: HollowHeap<u16, u16> = HollowHeap::min_heap();
-    assert!(heap.is_empty());
-    heap.push(5);
-    let index = heap.push(42);
-    heap.push(4);
-    heap.change_key(index, 2);
-    assert!(heap.pop() == Some(42));
-    assert!(heap.pop() == Some(4));
-    assert!(heap.pop() == Some(5));
-    assert!(heap.pop() == None);
-}
+    #[test]
+    fn pop_node_min_heap() {
+        let mut heap: HollowHeap<u8, u8> = HollowHeap::min_heap();
+        assert!(heap.is_empty());
+        heap.push(2);
+        heap.push(8);
+        heap.push(4);
+        heap.push(9);
+        heap.push(1);
+        assert!(heap.pop() == Some(1));
+        assert!(heap.pop() == Some(2));
+        assert!(heap.pop() == Some(4));
+        assert!(heap.pop() == Some(8));
+        assert!(heap.pop() == Some(9));
+        assert!(heap.pop() == None);
+    }
 
-#[test]
-fn change_item_with_min_heap() {
-    let mut heap: HollowHeap<u16, u16> = HollowHeap::min_heap();
-    assert!(heap.is_empty());
-    heap.push(5);
-    let index = heap.push(42);
-    heap.push(4);
-    heap.change_item(index, 2);
-    assert!(heap.pop() == Some(2));
-    assert!(heap.pop() == Some(4));
-    assert!(heap.pop() == Some(5));
-    assert!(heap.pop() == None);
-}
+    #[test]
+    fn change_key_with_min_heap() {
+        let mut heap: HollowHeap<u16, u16> = HollowHeap::min_heap();
+        assert!(heap.is_empty());
+        heap.push(5);
+        let index = heap.push(42);
+        heap.push(4);
+        heap.change_key(index, 2);
+        assert!(heap.pop() == Some(42));
+        assert!(heap.pop() == Some(4));
+        assert!(heap.pop() == Some(5));
+        assert!(heap.pop() == None);
+    }
 
-#[test]
-#[should_panic]
-fn faulty_change_key_panics() {
-    let mut heap: HollowHeap<u16, u16> = HollowHeap::min_heap();
-    assert!(heap.is_empty());
-    heap.push(5);
-    let index = heap.push(1);
-    heap.push(4);
-    heap.change_key(index, 2);
-}
+    #[test]
+    fn change_item_with_min_heap() {
+        let mut heap: HollowHeap<u16, u16> = HollowHeap::min_heap();
+        assert!(heap.is_empty());
+        heap.push(5);
+        let index = heap.push(42);
+        heap.push(4);
+        heap.change_item(index, 2);
+        assert!(heap.pop() == Some(2));
+        assert!(heap.pop() == Some(4));
+        assert!(heap.pop() == Some(5));
+        assert!(heap.pop() == None);
+    }
 
-#[test]
-fn push_same_values() {
-    let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
-    assert!(heap.is_empty());
-    heap.push(2);
-    heap.push(2);
-    heap.push(1);
-    assert!(!heap.is_empty());
-    assert!(heap.dag.len() == 3);
-    assert!(heap.pop() == Some(2));
-    assert!(heap.pop() == Some(2));
-    assert!(heap.pop() == Some(1));
-    assert!(heap.pop() == None);
-}
+    #[test]
+    #[should_panic]
+    fn faulty_change_key_panics() {
+        let mut heap: HollowHeap<u16, u16> = HollowHeap::min_heap();
+        assert!(heap.is_empty());
+        heap.push(5);
+        let index = heap.push(1);
+        heap.push(4);
+        heap.change_key(index, 2);
+    }
 
-#[derive(PartialEq, Eq)]
-struct SomeStruct {
-    some_value: u32,
-}
+    #[test]
+    fn push_same_values() {
+        let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
+        assert!(heap.is_empty());
+        heap.push(2);
+        heap.push(2);
+        heap.push(1);
+        assert!(!heap.is_empty());
+        assert!(heap.dag.len() == 3);
+        assert!(heap.pop() == Some(2));
+        assert!(heap.pop() == Some(2));
+        assert!(heap.pop() == Some(1));
+        assert!(heap.pop() == None);
+    }
 
-#[test]
-fn different_key_from_value() {
-    let mut heap: HollowHeap<u32, &SomeStruct> =
-        HollowHeap::new(|lhs, rhs| lhs > rhs, |val| val.some_value);
-    assert!(heap.is_empty());
-    let first = SomeStruct { some_value: 2 };
-    heap.push(&first);
-    let second = SomeStruct { some_value: 3 };
-    heap.push(&second);
-    let third = SomeStruct { some_value: 1 };
-    heap.push(&third);
-    assert!(!heap.is_empty());
-    assert!(heap.dag.len() == 3);
-    assert!(heap.pop() == Some(&second));
-    assert!(heap.pop() == Some(&first));
-    assert!(heap.pop() == Some(&third));
-    assert!(heap.pop() == None);
-}
+    #[derive(PartialEq, Eq)]
+    struct SomeStruct {
+        some_value: u32,
+    }
 
-#[test]
-fn change_item_with_complex_value() {
-    let mut heap: HollowHeap<u32, &SomeStruct> =
-        HollowHeap::new(|lhs, rhs| lhs < rhs, |val| val.some_value);
-    assert!(heap.is_empty());
-    let first = SomeStruct { some_value: 42 };
-    let index = heap.push(&first);
-    let second = SomeStruct { some_value: 3 };
-    heap.push(&second);
-    let third = SomeStruct { some_value: 1 };
-    heap.push(&third);
-    let changed = SomeStruct { some_value: 2 };
-    heap.change_item(index, &changed);
-    assert!(!heap.is_empty());
-    assert!(heap.pop() == Some(&third));
-    assert!(heap.pop() == Some(&changed));
-    assert!(heap.pop() == Some(&second));
-    assert!(heap.pop() == None);
+    #[test]
+    fn different_key_from_value() {
+        let mut heap: HollowHeap<u32, &SomeStruct> =
+            HollowHeap::new(|lhs, rhs| lhs > rhs, |val| val.some_value);
+        assert!(heap.is_empty());
+        let first = SomeStruct { some_value: 2 };
+        heap.push(&first);
+        let second = SomeStruct { some_value: 3 };
+        heap.push(&second);
+        let third = SomeStruct { some_value: 1 };
+        heap.push(&third);
+        assert!(!heap.is_empty());
+        assert!(heap.dag.len() == 3);
+        assert!(heap.pop() == Some(&second));
+        assert!(heap.pop() == Some(&first));
+        assert!(heap.pop() == Some(&third));
+        assert!(heap.pop() == None);
+    }
+
+    #[test]
+    fn change_item_with_complex_value() {
+        let mut heap: HollowHeap<u32, &SomeStruct> =
+            HollowHeap::new(|lhs, rhs| lhs < rhs, |val| val.some_value);
+        assert!(heap.is_empty());
+        let first = SomeStruct { some_value: 42 };
+        let index = heap.push(&first);
+        let second = SomeStruct { some_value: 3 };
+        heap.push(&second);
+        let third = SomeStruct { some_value: 1 };
+        heap.push(&third);
+        let changed = SomeStruct { some_value: 2 };
+        heap.change_item(index, &changed);
+        assert!(!heap.is_empty());
+        assert!(heap.pop() == Some(&third));
+        assert!(heap.pop() == Some(&changed));
+        assert!(heap.pop() == Some(&second));
+        assert!(heap.pop() == None);
+    }
+
 }
 
 /// A builder to construct a [`HollowHeap`](./struct.HollowHeap.html).
@@ -707,23 +718,33 @@ impl<T: PartialOrd + Copy> HollowHeapBuilder<T, T> {
     }
 }
 
-#[test]
-fn builder_builds_heap() {
-    let capacity = 5;
-    let mut builder = HollowHeapBuilder::new(|st: &SomeStruct| st.some_value);
-    let mut heap = builder
-        .with_compare(|lhs, rhs| lhs < rhs)
-        .with_capacity(capacity)
-        .build();
-    assert!(heap.dag.capacity() == capacity);
-    heap.push(SomeStruct { some_value: 50 });
-    heap.push(SomeStruct { some_value: 40 });
-    heap.push(SomeStruct { some_value: 30 });
+#[cfg(test)]
+mod builder_tests {
+    use super::HollowHeapBuilder;
 
-    assert!(heap.pop() == Some(SomeStruct { some_value: 30 }));
-    assert!(heap.pop() == Some(SomeStruct { some_value: 40 }));
-    assert!(heap.pop() == Some(SomeStruct { some_value: 50 }));
-    assert!(heap.pop() == None);
+    #[derive(PartialEq, Eq)]
+    struct St {
+        val: u32,
+    }
+
+    #[test]
+    fn builder_builds_heap() {
+        let capacity = 5;
+        let mut builder = HollowHeapBuilder::new(|st: &St| st.val);
+        let mut heap = builder
+            .with_compare(|lhs, rhs| lhs < rhs)
+            .with_capacity(capacity)
+            .build();
+        assert!(heap.dag.capacity() == capacity);
+        heap.push(St { val: 50 });
+        heap.push(St { val: 40 });
+        heap.push(St { val: 30 });
+
+        assert!(heap.pop() == Some(St { val: 30 }));
+        assert!(heap.pop() == Some(St { val: 40 }));
+        assert!(heap.pop() == Some(St { val: 50 }));
+        assert!(heap.pop() == None);
+    }
 }
 
 impl<K: PartialOrd + fmt::Debug, V> IntoIterator for HollowHeap<K, V> {
@@ -752,20 +773,25 @@ impl<K: PartialOrd + fmt::Debug, V> Iterator for IntoIter<K, V> {
     }
 }
 
-#[test]
-fn iterator_returns_sorted_items() {
-    let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
-    assert!(heap.is_empty());
-    heap.push(2);
-    heap.push(8);
-    heap.push(4);
-    heap.push(9);
-    heap.push(1);
-    let mut iter = heap.into_iter();
-    assert!(iter.next() == Some(9));
-    assert!(iter.next() == Some(8));
-    assert!(iter.next() == Some(4));
-    assert!(iter.next() == Some(2));
-    assert!(iter.next() == Some(1));
-    assert!(iter.next() == None);
+#[cfg(test)]
+mod iter_tests {
+    use super::HollowHeap;
+
+    #[test]
+    fn iterator_returns_sorted_items() {
+        let mut heap: HollowHeap<u8, u8> = HollowHeap::max_heap();
+        assert!(heap.is_empty());
+        heap.push(2);
+        heap.push(8);
+        heap.push(4);
+        heap.push(9);
+        heap.push(1);
+        let mut iter = heap.into_iter();
+        assert!(iter.next() == Some(9));
+        assert!(iter.next() == Some(8));
+        assert!(iter.next() == Some(4));
+        assert!(iter.next() == Some(2));
+        assert!(iter.next() == Some(1));
+        assert!(iter.next() == None);
+    }
 }
